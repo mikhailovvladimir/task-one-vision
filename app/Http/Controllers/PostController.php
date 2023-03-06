@@ -71,7 +71,7 @@ class PostController extends Controller
         $request->validate([
             'title' => ['required', 'string'],
             'body' => ['required', 'string'],
-            'author_name' => 'nullable',
+            'author_name' => ['required', 'string'],
         ]);
 
         $validateValuesPost = $request->all();
@@ -82,18 +82,20 @@ class PostController extends Controller
             'userId' => auth()->user()->getAuthIdentifier()
         ]);
 
-        $postId = $response->object()->id ?? null;
-
+        $postId = is_numeric($response->object()->id) ? (int)$response->object()->id : null;
         if (empty($postId)) {
             throw new NotFoundHttpException();
         }
 
-        DB::table('posts')->upsert([
-            [
-                'id' => $postId,
-                'author_name' => $validateValuesPost['author_name']
-            ]
-        ], ['id', 'author_name'], ['author_name']);
+        $query = Post::where(['id' => $postId])->get();
+        $postId = !empty($query[0]) ? $query[0]->id : null;
+
+        if (empty($postId)) {
+            $post = new Post();
+            $post->id = $postId;
+            $post->author_name = $validateValuesPost['author_name'];
+            $post->save();
+        }
 
         return redirect()->route('posts.index')->with('success', 'Post created successfully.');
     }
@@ -113,8 +115,8 @@ class PostController extends Controller
             throw new NotFoundHttpException();
         }
 
-        $collections = Post::where(['id' => $post->id])->get();
-        $postFromDb = $collections[0] ?? null;
+        $query = Post::where(['id' => $post->id])->get();
+        $postFromDb = $query[0] ?? null;
         $post->authorName = $postFromDb->author_name ?? null;
 
         return view('posts.show', compact('post'));
@@ -135,8 +137,8 @@ class PostController extends Controller
             throw new NotFoundHttpException();
         }
 
-        $collections = Post::where(['id' => $postId])->get();
-        $postFromDb = $collections[0] ?? null;
+        $query = Post::where(['id' => $postId])->get();
+        $postFromDb = $query[0] ?? null;
         if (isset($postFromDb)) {
             $dummyJsonPost->authorName = $postFromDb->getAttribute('author_name');
         }
@@ -157,7 +159,7 @@ class PostController extends Controller
         $request->validate([
             'title' => ['required', 'string'],
             'body' => ['required', 'string'],
-            'author_name' => 'nullable',
+            'author_name' => ['required', 'string'],
         ]);
 
         $postId = filter_var($request->segment(2), FILTER_VALIDATE_INT);
@@ -174,12 +176,18 @@ class PostController extends Controller
             throw new NotFoundHttpException();
         }
 
-        DB::table('posts')->upsert([
-            [
-                'id' => $postId,
-                'author_name' => $validateValues['author_name']
-            ]
-        ], ['id', 'author_name'], ['author_name']);
+        $query = Post::where(['id'=> $postId])->get();
+        $onePost = $query[0] ?? null;
+
+        if (!empty($onePost)) {
+            $onePost->author_name = $request['author_name'];
+            $onePost->save();
+        } else {
+            $post = new Post();
+            $post->id = $postId;
+            $post->author_name = $request['author_name'];
+            $post->save();
+        }
 
         return redirect()->route('posts.index')->with('success', 'Post updated successfully');
     }

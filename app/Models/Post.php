@@ -8,8 +8,4 @@ use Illuminate\Database\Eloquent\Model;
 class Post extends Model
 {
     use HasFactory;
-
-    public $id;
-
-    public $authorName;
 }
